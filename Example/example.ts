@@ -168,7 +168,6 @@ const startSock = async() => {
 	return sock
 }
 
-
 const getLabels = () => store?.labelAssociations
 
 const setLabels = async(chats: string[], labels: string[]) => {
@@ -182,12 +181,10 @@ const setLabels = async(chats: string[], labels: string[]) => {
 (async() => {
 	sock = await startSock()
 
-
 	setTimeout(async() => {
 		const associations = getLabels()
 		log(associations)
 		await setLabels(['2', '3'], ['79384518299@s.whatsapp.net'])
-
 
 		await sock.chatModify({ removeLabel: { label: '1' } }, '79384518299@s.whatsapp.net')
 	}, 6000)
