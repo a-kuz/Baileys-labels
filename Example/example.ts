@@ -1,8 +1,10 @@
 import { Boom } from '@hapi/boom'
-import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, isJidBroadcast, makeCacheableSignalKeyStore, makeInMemoryStore, MessageRetryMap, useMultiFileAuthState } from '../src'
+import { log } from 'console'
+import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, isJidBroadcast, makeCacheableSignalKeyStore, makeInMemoryStore, MessageRetryMap, useMultiFileAuthState, WASocket } from '../src'
 import MAIN_LOGGER from '../src/Utils/logger'
 
 const logger = MAIN_LOGGER.child({ })
+let sock: WASocket
 logger.level = 'trace'
 
 const useStore = !process.argv.includes('--no-store')
@@ -166,4 +168,25 @@ const startSock = async() => {
 	return sock
 }
 
-startSock()
+const getLabels = () => store?.labelAssociations
+
+const setLabels = async(chats: string[], labels: string[]) => {
+	for(const chat of chats) {
+		for(const label of labels) {
+			await sock.chatModify({ addLabel: { label } }, chat)
+		}
+	}
+}
+
+(async() => {
+	sock = await startSock()
+
+	setTimeout(async() => {
+		const associations = getLabels()
+		log(associations)
+		await setLabels(['2', '3'], ['79384518299@s.whatsapp.net'])
+
+		await sock.chatModify({ removeLabel: { label: '1' } }, '79384518299@s.whatsapp.net')
+	}, 6000)
+
+})()
