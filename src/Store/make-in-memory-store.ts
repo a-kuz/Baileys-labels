@@ -5,6 +5,7 @@ import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
 import type { BaileysEventEmitter, Chat, ConnectionState, Contact, GroupMetadata, PresenceData, WAMessage, WAMessageCursor, WAMessageKey } from '../Types'
+import { LabelAssociation } from '../Types/Label'
 import { toNumber, updateMessageWithReaction, updateMessageWithReceipt } from '../Utils'
 import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
@@ -19,8 +20,8 @@ export const waChatKey = (pin: boolean) => ({
 export const waMessageID = (m: WAMessage) => m.key.id || ''
 
 export type BaileysInMemoryStoreConfig = {
-	chatKey?: Comparable<Chat, string>
-	logger?: Logger
+  chatKey?: Comparable<Chat, string>
+  logger?: Logger
 }
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
@@ -37,6 +38,7 @@ export default (
 	const contacts: { [_: string]: Contact } = { }
 	const groupMetadata: { [_: string]: GroupMetadata } = { }
 	const presences: { [id: string]: { [participant: string]: PresenceData } } = { }
+	const labelAssociations: { [_: string]: LabelAssociation } = { }
 	const state: ConnectionState = { connection: 'close' }
 
 	const assertMessageList = (jid: string) => {
@@ -61,11 +63,11 @@ export default (
 	}
 
 	/**
-	 * binds to a BaileysEventEmitter.
-	 * It listens to all events and constructs a state that you can query accurate data from.
-	 * Eg. can use the store to fetch chats, contacts, messages etc.
-	 * @param ev typically the event emitter from the socket connection
-	 */
+   * binds to a BaileysEventEmitter.
+   * It listens to all events and constructs a state that you can query accurate data from.
+   * Eg. can use the store to fetch chats, contacts, messages etc.
+   * @param ev typically the event emitter from the socket connection
+   */
 	const bind = (ev: BaileysEventEmitter) => {
 		ev.on('connection.update', update => {
 			Object.assign(state, update)
@@ -139,6 +141,14 @@ export default (
 			for(const item of deletions) {
 				chats.deleteById(item)
 			}
+		})
+		ev.on('labelAssociation.set', ({ chat, label, type = 'jid' }) => {
+			const id = chat + label
+			labelAssociations[id] = { id, associatioinId: chat, labelId: label, type }
+		})
+		ev.on('labelAssociation.delete', ({ chat, label }) => {
+			const id = chat + label
+			delete labelAssociations[id]
 		})
 		ev.on('messages.upsert', ({ messages: newMessages, type }) => {
 			switch (type) {

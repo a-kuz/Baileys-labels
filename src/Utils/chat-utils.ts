@@ -7,7 +7,7 @@ import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildren, isJidGroup, jidN
 import { aesDecrypt, aesEncrypt, hkdf, hmacSign } from './crypto'
 import { toNumber } from './generics'
 import { LT_HASH_ANTI_TAMPERING } from './lt-hash'
-import { downloadContentFromMessage, } from './messages-media'
+import { downloadContentFromMessage } from './messages-media'
 
 type FetchAppStateSyncKey = (keyId: string) => Promise<proto.Message.IAppStateSyncKeyData | null | undefined>
 
@@ -606,6 +606,28 @@ export const chatModificationToAppPatch = (
 			apiVersion: 1,
 			operation: OP.SET,
 		}
+	} else if('addLabel' in mod) {
+		patch = {
+			syncAction: {
+				labelAssociationAction:{
+					labeled: true
+				} },
+			index: ['label_jid', mod.addLabel.label, jid ],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET,
+		}
+	} else if('removeLabel' in mod) {
+		patch = {
+			syncAction: {
+				labelAssociationAction:{
+					labeled: false
+				} },
+			index: ['label_jid', mod.removeLabel.label, jid ],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET,
+		}
 	} else {
 		throw new Boom('not supported')
 	}
@@ -731,6 +753,18 @@ export const processSyncAction = (
 		if(!isInitialSync) {
 			ev.emit('chats.delete', [id])
 		}
+	} else if(action?.labelAssociationAction) {
+		const label = syncAction.index[1]
+		const chat = syncAction.index[2]
+		const labeled = action.labelAssociationAction.labeled
+
+		logger?.info(`label association updated '${chat}' ${labeled ? '<->' : '<-x->'} label ${label}'`)
+		if(labeled) {
+			ev.emit('labelAssociation.set', { chat, label })
+		} else {
+			ev.emit('labelAssociation.delete', { chat, label })
+		}
+
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')
 	}

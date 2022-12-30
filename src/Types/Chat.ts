@@ -69,12 +69,20 @@ export type ChatModification =
         /** mute for duration, or provide timestamp of mute to remove*/
         mute: number | null
     }
+    |
+    {
+        addLabel: { label: string }
+    }
+    |
+    {
+        removeLabel: { label: string }
+    }
     | {
         clear: 'all' | { messages: {id: string, fromMe?: boolean, timestamp: number}[] }
     }
     | {
         star: {
-            messages: { id: string, fromMe?: boolean }[],
+            messages: { id: string, fromMe?: boolean }[]
             star: boolean
         }
     }
