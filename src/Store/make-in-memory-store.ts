@@ -276,6 +276,7 @@ export default (
 		contacts,
 		messages,
 		groupMetadata,
+		labelAssociations,
 		state,
 		presences,
 		bind,
