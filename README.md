@@ -268,7 +268,21 @@ export type BaileysEventMap = {
     'blocklist.set': { blocklist: string[] }
     'blocklist.update': { blocklist: string[], type: 'add' | 'remove' }
     /** Receive an update on a call, including when the call was received, rejected, accepted */
-    'call': WACallEvent[]
+    'call': WACallEvent[],
+    
+    /** label editing */
+    'label.upsert': Label
+    
+    /** add/remove the label of the chat  */
+    'labelAssociation.set': {
+        chat: string;
+        labelId: string;
+        type?: string;
+    };
+    'labelAssociation.delete': {
+        chat: string;
+        labelId: string;
+    };
 }
 ```
 
@@ -313,6 +327,10 @@ sock.ev.on('chats.set', () => {
 
 sock.ev.on('contacts.set', () => {
     console.log('got contacts', Object.values(store.contacts))
+})
+
+sock.ev.on('labels.upsert', () => {
+    console.log('got labels', Object.values(store.labels))
 })
 
 ```
@@ -680,6 +698,22 @@ WA uses an encrypted form of communication to send chat/app updates. This has be
     pin: true // or `false` to unpin
   },
   '123456@s.whatsapp.net')
+
+- Add/remove label
+  ``` ts
+  await sock.chatModify({
+    addLabel: {
+      label: '1',
+    },
+  },
+  '123456@s.whatsapp.net')
+  
+  await sock.chatModify({
+    removeLabel: {
+      label: '1',
+    },
+  },
+  '123456@s.whatsapp.net')
   ```
 
 **Note:** if you mess up one of your updates, WA can log you out of all your devices and you'll have to log in again.
@@ -755,6 +789,10 @@ await sock.sendMessage(
     await sock.updateBlockStatus("xyz@s.whatsapp.net", "unblock") // Unblock user
     ```
 - To get a business profile, such as description or category
+    ```ts
+    const profile = await sock.getBusinessProfile("xyz@s.whatsapp.net")
+    console.log("business description: " + profile.description + ", category: " + profile.category)
+- To get a label list
     ```ts
     const profile = await sock.getBusinessProfile("xyz@s.whatsapp.net")
     console.log("business description: " + profile.description + ", category: " + profile.category)

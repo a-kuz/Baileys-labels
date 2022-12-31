@@ -3,11 +3,12 @@ import { AxiosRequestConfig } from 'axios'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { BaileysEventEmitter, Chat, ChatModification, ChatMutation, ChatUpdate, Contact, InitialAppStateSyncOptions, LastMessageList, LTHashState, WAPatchCreate, WAPatchName } from '../Types'
+import { Label } from '../Types/Label'
 import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildren, isJidGroup, jidNormalizedUser } from '../WABinary'
 import { aesDecrypt, aesEncrypt, hkdf, hmacSign } from './crypto'
 import { toNumber } from './generics'
 import { LT_HASH_ANTI_TAMPERING } from './lt-hash'
-import { downloadContentFromMessage, } from './messages-media'
+import { downloadContentFromMessage } from './messages-media'
 
 type FetchAppStateSyncKey = (keyId: string) => Promise<proto.Message.IAppStateSyncKeyData | null | undefined>
 
@@ -606,6 +607,28 @@ export const chatModificationToAppPatch = (
 			apiVersion: 1,
 			operation: OP.SET,
 		}
+	} else if('addLabel' in mod) {
+		patch = {
+			syncAction: {
+				labelAssociationAction:{
+					labeled: true
+				} },
+			index: ['label_jid', mod.addLabel.label, jid ],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET,
+		}
+	} else if('removeLabel' in mod) {
+		patch = {
+			syncAction: {
+				labelAssociationAction:{
+					labeled: false
+				} },
+			index: ['label_jid', mod.removeLabel.label, jid ],
+			type: 'regular',
+			apiVersion: 3,
+			operation: OP.SET,
+		}
 	} else {
 		throw new Boom('not supported')
 	}
@@ -731,6 +754,23 @@ export const processSyncAction = (
 		if(!isInitialSync) {
 			ev.emit('chats.delete', [id])
 		}
+	} else if(action?.labelAssociationAction) {
+		const [ labelId, chatId ] = syncAction.index.slice(1)
+		const { labeled } = action.labelAssociationAction
+
+		logger?.info(`label association updated: '${chatId}' ${labeled ? '<->' : '<-x->'} label${labelId}'`)
+		if(labeled) {
+			ev.emit('labelAssociation.set', { chat: chatId, labelId })
+		} else {
+			ev.emit('labelAssociation.delete', { chat: chatId, labelId })
+		}
+	} else if(action?.labelEditAction) {
+		const [ labelId ] = syncAction.index.slice(1)
+		const updatedLabel = new Label (labelId, action.labelEditAction)
+		logger?.info(`label ${labelId} ${updatedLabel.deleted ? 'deleted' : `updated => name: '${updatedLabel.name}', color: ${updatedLabel.color}`}`)
+		ev.emit('labels.upsert', [updatedLabel])
+
+
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')
 	}
