@@ -70,8 +70,6 @@ const startSock = async() => {
 				const labels = store.labels
 				logger.info(JSON.stringify({ labels }, null, 2))
 			}
-
-
 		},
 	)
 
