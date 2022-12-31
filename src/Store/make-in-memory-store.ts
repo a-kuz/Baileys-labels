@@ -262,7 +262,7 @@ export default (
 
 	const toJSON = () => ({
 		chats,
-		contacts: contacts,
+		contacts,
 		messages,
 		labels,
 		labelAssociations
