@@ -5,6 +5,7 @@ import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
 import type { BaileysEventEmitter, Chat, ConnectionState, Contact, GroupMetadata, PresenceData, WAMessage, WAMessageCursor, WAMessageKey } from '../Types'
+import { Label, LabelAssociation } from '../Types/Label'
 import { toNumber, updateMessageWithReaction, updateMessageWithReceipt } from '../Utils'
 import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
@@ -19,8 +20,8 @@ export const waChatKey = (pin: boolean) => ({
 export const waMessageID = (m: WAMessage) => m.key.id || ''
 
 export type BaileysInMemoryStoreConfig = {
-	chatKey?: Comparable<Chat, string>
-	logger?: Logger
+  chatKey?: Comparable<Chat, string>
+  logger?: Logger
 }
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
@@ -37,6 +38,8 @@ export default (
 	const contacts: { [_: string]: Contact } = { }
 	const groupMetadata: { [_: string]: GroupMetadata } = { }
 	const presences: { [id: string]: { [participant: string]: PresenceData } } = { }
+	const labels: { [_: string]: Label } = { }
+	const labelAssociations: { [_: string]: LabelAssociation } = { }
 	const state: ConnectionState = { connection: 'close' }
 
 	const assertMessageList = (jid: string) => {
@@ -47,25 +50,28 @@ export default (
 		return messages[jid]
 	}
 
-	const contactsUpsert = (newContacts: Contact[]) => {
-		const oldContacts = new Set(Object.keys(contacts))
-		for(const contact of newContacts) {
-			oldContacts.delete(contact.id)
-			contacts[contact.id] = Object.assign(
-				contacts[contact.id] || {},
-				contact
+	const collectionUpsert = <T extends { id: string }>(newItems: T[], collection: { [id: string]: T }) => {
+		const oldItems = new Set(Object.keys(collection))
+
+		for(const item of newItems) {
+
+			oldItems.delete(item.id)
+			collection[item.id] = Object.assign(
+				collection[item.id] || {},
+				item
 			)
 		}
 
-		return oldContacts
+		return oldItems
 	}
 
+
 	/**
-	 * binds to a BaileysEventEmitter.
-	 * It listens to all events and constructs a state that you can query accurate data from.
-	 * Eg. can use the store to fetch chats, contacts, messages etc.
-	 * @param ev typically the event emitter from the socket connection
-	 */
+   * binds to a BaileysEventEmitter.
+   * It listens to all events and constructs a state that you can query accurate data from.
+   * Eg. can use the store to fetch chats, contacts, messages etc.
+   * @param ev typically the event emitter from the socket connection
+   */
 	const bind = (ev: BaileysEventEmitter) => {
 		ev.on('connection.update', update => {
 			Object.assign(state, update)
@@ -88,7 +94,7 @@ export default (
 			const chatsAdded = chats.insertIfAbsent(...newChats).length
 			logger.debug({ chatsAdded }, 'synced chats')
 
-			const oldContacts = contactsUpsert(newContacts)
+			const oldContacts = collectionUpsert(newContacts, contacts)
 			for(const jid of oldContacts) {
 				delete contacts[jid]
 			}
@@ -139,6 +145,17 @@ export default (
 			for(const item of deletions) {
 				chats.deleteById(item)
 			}
+		})
+		ev.on('labels.upsert', (updatedLabels: Label[]) => {
+			collectionUpsert(updatedLabels, labels)
+		})
+		ev.on('labelAssociation.set', ({ chat, labelId, type = 'jid' }) => {
+			const id = `${chat}-${labelId}`
+			labelAssociations[id] = { id, associatioinId: chat, labelId, type }
+		})
+		ev.on('labelAssociation.delete', ({ chat, labelId }) => {
+			const id = `${chat}-${labelId}`
+			delete labelAssociations[id]
 		})
 		ev.on('messages.upsert', ({ messages: newMessages, type }) => {
 			switch (type) {
@@ -245,18 +262,31 @@ export default (
 
 	const toJSON = () => ({
 		chats,
-		contacts,
-		messages
+		contacts: contacts,
+		messages,
+		labels,
+		labelAssociations
 	})
 
-	const fromJSON = (json: { chats: Chat[], contacts: { [id: string]: Contact }, messages: { [id: string]: WAMessage[] } }) => {
+	const fromJSON = (json: {
+		chats: Chat[]
+		contacts: { [id: string]: Contact }
+		messages: { [id: string]: WAMessage[] }
+		labels: { [id: string]: Label }
+		labelAssociations: { [id: string]: LabelAssociation }
+	}) => {
 		chats.upsert(...json.chats)
-		contactsUpsert(Object.values(json.contacts))
+		collectionUpsert(Object.values(json.contacts), contacts)
 		for(const jid in json.messages) {
 			const list = assertMessageList(jid)
 			for(const msg of json.messages[jid]) {
 				list.upsert(proto.WebMessageInfo.fromObject(msg), 'append')
 			}
+		}
+
+		if(json.labels && json.labelAssociations) {
+			collectionUpsert(Object.values(json.labels), labels)
+			collectionUpsert(Object.values(json.labelAssociations), labelAssociations)
 		}
 	}
 
@@ -266,6 +296,8 @@ export default (
 		contacts,
 		messages,
 		groupMetadata,
+		labels,
+		labelAssociations,
 		state,
 		presences,
 		bind,
@@ -356,3 +388,4 @@ export default (
 		}
 	}
 }
+

@@ -5,6 +5,7 @@ import { WACallEvent } from './Call'
 import { Chat, ChatUpdate, PresenceData } from './Chat'
 import { Contact } from './Contact'
 import { GroupMetadata, ParticipantAction } from './GroupMetadata'
+import { Label } from './Label'
 import { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
 import { ConnectionState } from './State'
 
@@ -54,6 +55,10 @@ export type BaileysEventMap = {
     'blocklist.update': { blocklist: string[], type: 'add' | 'remove' }
     /** Receive an update on a call, including when the call was received, rejected, accepted */
     'call': WACallEvent[]
+
+    'labels.upsert': Label[]
+   'labelAssociation.set': { chat: string, labelId: string, type?: string }
+   'labelAssociation.delete': { chat: string, labelId: string }
 }
 
 export type BufferedEventData = {
@@ -73,7 +78,7 @@ export type BufferedEventData = {
     messageUpdates: { [key: string]: WAMessageUpdate }
     messageDeletes: { [key: string]: WAMessageKey }
     messageReactions: { [key: string]: { key: WAMessageKey, reactions: proto.IReaction[] } }
-    messageReceipts: { [key: string]: { key: WAMessageKey, userReceipt: proto.IUserReceipt[] } },
+    messageReceipts: { [key: string]: { key: WAMessageKey, userReceipt: proto.IUserReceipt[] } }
     groupUpdates: { [jid: string]: Partial<GroupMetadata> }
 }
 
