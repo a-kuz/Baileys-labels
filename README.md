@@ -792,11 +792,6 @@ await sock.sendMessage(
     ```ts
     const profile = await sock.getBusinessProfile("xyz@s.whatsapp.net")
     console.log("business description: " + profile.description + ", category: " + profile.category)
-- To get a label list
-    ```ts
-    const profile = await sock.getBusinessProfile("xyz@s.whatsapp.net")
-    console.log("business description: " + profile.description + ", category: " + profile.category)
-    ```
 Of course, replace ``` xyz ``` with an actual ID. 
 
 ## Groups
